@@ -105,12 +105,61 @@ exports.getAllReservations = getAllReservations;
  * @return {Promise<[{}]>}  A promise to the properties.
  */
 const getAllProperties = function(options, limit = 10) {
-  return pool.query(`
-    SELECT *
-    FROM properties
-    LIMIT $1
-  `, [limit])
+  // return pool.query(`
+  //   SELECT *
+  //   FROM properties
+  //   LIMIT $1
+  // `, [limit])
+  // .then(res => res.rows);
+  const queryParams = [];
+  let queryString = `
+  SELECT properties.*, AVG(rating) as average_rating
+  FROM properties
+  INNER JOIN property_reviews ON properties.id = property_id
+  `;
+  if (options.city) {
+    queryParams.push(`%${options.city}%`);
+    queryString += `WHERE city LIKE $${queryParams.length} `;
+  }
+  if (options.owner_id) {
+    queryParams.push(options.owner_id);
+    if (queryParams.length = 1) {
+      queryString += `WHERE owner_id = $${queryParams.length} `;
+    } else {
+      queryString += `AND owner_id = $${queryParams.length} `;
+    }
+  }
+  if (options.minimum_price_per_night && options.maximum_price_per_night) {
+    queryParams.push(options.minimum_price_per_night, options.maximum_price_per_night);
+    if (queryParams.length = 2) {
+      queryString += `WHERE cost_per_night < $${queryParams[1]} AND cost_per)night $${queryParams[0]} `;
+    } else {
+      queryString += `AND cost_per_night < $${queryParams[1]} AND cost_per)night $${queryParams[0]} `;
+    }
+  }
+  queryString += `
+  GROUP BY properties.id`
+  if (options.minimum_rating) {
+    queryParams.push(options.minimum_rating);
+    queryString += `HAVING AVG(rating) > $${queryParams.length} `;
+  }
+  queryParams.push(limit);
+  queryString += `
+  ORDER BY cost_per_night
+  LIMIT $${queryParams.length};
+  `;
+  return pool.query(queryString, queryParams)
   .then(res => res.rows);
+  // return pool.query(`
+  //   SELECT properties.id, title, cost_per_night, AVG(rating) as average_rating
+  //   FROM properties
+  //   INNER JOIN property_reviews ON properties.id = property_id
+  //   WHERE city LIKE '%ancouv%'
+  //   GROUP BY properties.id
+  //   HAVING AVG(rating) >= 4
+  //   ORDER BY cost_per_night ASC
+  //   LIMIT 1$;
+  // `, [limit])
 }
 exports.getAllProperties = getAllProperties;
 
